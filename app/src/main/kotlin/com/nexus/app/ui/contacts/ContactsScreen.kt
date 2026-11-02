@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.MergeType
+import androidx.compose.material.icons.automirrored.outlined.MergeType
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -127,7 +127,7 @@ fun ContactsScreen(viewModel: ContactsViewModel = hiltViewModel()) {
                 actions = {
                     if (selection.size >= 2) {
                         TextButton(onClick = { showMergeDialog = true }) {
-                            Icon(Icons.Outlined.MergeType, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Outlined.MergeType, contentDescription = null)
                             Spacer(Modifier.width(4.dp))
                             Text("Объединить")
                         }

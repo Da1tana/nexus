@@ -1,0 +1,24 @@
+# NEXUS
+
+Единый центр сообщений для Android (основное устройство — Huawei Nova 15 Pro, EMUI 15).
+Собирает сообщения Telegram, WhatsApp, Viber, VK, Messenger, SMS, Gmail и других приложений из системных
+уведомлений в одну ленту с диалогами, поиском и быстрыми ответами. Все данные остаются на устройстве.
+
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) — что сделано и проверено
+- [ARCHITECTURE.md](ARCHITECTURE.md) — модули и решения
+- [INTEGRATIONS.md](INTEGRATIONS.md) — что реально возможно с каждым мессенджером
+
+## Установка
+
+1. Скачайте `NEXUS-debug.apk` из Releases → `debug-latest` (или артефакт последнего прогона Actions).
+2. Установите, разрешив установку из этого источника.
+3. Откройте NEXUS → «Открыть настройки» → включите NEXUS в «Доступ к уведомлениям».
+4. Настройки → Диагностика → выполните инструкции EMUI (автозапуск, батарея).
+
+## Сборка
+
+```
+gradlew.bat assembleDebug        # Windows
+./gradlew assembleDebug          # Linux/macOS
+```
+APK: `releases/NEXUS-debug.apk`. Тесты: `gradlew :core:engine:test`, инструментальные — `connectedDebugAndroidTest`.

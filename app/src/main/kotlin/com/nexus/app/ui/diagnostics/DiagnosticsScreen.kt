@@ -18,7 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -261,7 +261,7 @@ private fun StatusRow(title: String, value: String, health: Health) {
         val (icon, tint) = when (health) {
             Health.OK -> Icons.Outlined.CheckCircle to Color(0xFF2E7D32)
             Health.PROBLEM -> Icons.Outlined.ErrorOutline to MaterialTheme.colorScheme.error
-            Health.UNKNOWN -> Icons.Outlined.HelpOutline to MaterialTheme.colorScheme.onSurfaceVariant
+            Health.UNKNOWN -> Icons.AutoMirrored.Outlined.HelpOutline to MaterialTheme.colorScheme.onSurfaceVariant
         }
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))

@@ -1,0 +1,88 @@
+# ARCHITECTURE — NEXUS
+
+## Модули
+
+```
+NEXUS/
+├── core/model    чистый Kotlin: сущности домена, статусы, RawNotification, результаты разбора
+├── core/engine   чистый Kotlin: NotificationParser, дедупликация, ReplyEngine, FTS-запросы,
+│                 контракт MessagingConnector, каталог источников, политика хранения
+├── core/data     Android-библиотека: Room (сущности, DAO, FTS4), репозитории
+└── app           Android-приложение: NotificationListenerService, RemoteInput-канал, DI (Hilt),
+                  Compose UI (входящие, чаты, контакты, поиск, настройки, диагностика), WorkManager
+```
+
+Предложенная в ТЗ структура (отдельные модули `domain/*`, `integrations/*`, `feature/*`) сокращена до 4 модулей:
+в v0.1 у интеграций одна реализация (уведомления), а пустые модули ради вида архитектуры запрещены ТЗ.
+Границы сохранены пакетами внутри модулей; модуль интеграции уровня C (например, `integrations/telegram`)
+появится вместе с первой реальной реализацией `MessagingConnector`.
+
+Почему engine — чистый Kotlin: разбор уведомлений, дедупликация и выбор способа отправки — ядро продукта.
+Отделив его от Android через `RawNotification`, мы тестируем его обычными JVM-тестами без эмулятора.
+
+## Поток данных
+
+```
+StatusBarNotification
+  → NotificationExtractor (app)        только извлечение полей
+  → RawNotification
+  → NotificationParser (engine)        MessagingStyle → InboxStyle → простой текст
+  → ParseResult.Messages / Ignored
+  → NotificationRepository.ingest (data, одна транзакция)
+       источник → беседа → аккаунт/контакт → сообщения (INSERT OR IGNORE по dedupKey)
+       → подтверждение исходящих → действия → статистика
+  → ActiveNotificationRegistry (app)   живые PendingIntent для ответа и перехода
+```
+
+## Разделение сущностей
+
+| Понятие | Где | Примечание |
+|---|---|---|
+| Уведомление | `RawNotification`, `ActiveNotificationRegistry` | Живёт, пока активно в системе |
+| Сообщение | `MessageEntity` | Одно уведомление → 0..N сообщений |
+| Диалог | `ConversationEntity` | Уникален по (источник, externalKey) |
+| Контакт | `ContactEntity` + `ContactAccountEntity` | Человек ↔ аккаунты в источниках; объединение только вручную |
+| Источник | `AppSourceEntity` | Пакет приложения; вкл/выкл пользователем |
+| Способ ответа | `ReplyMethod`, `ReplyChannel`, `MessageActionEntity` | Доступность проверяется по живому реестру |
+| Подтверждение отправки | `MessageStatus`, `OutgoingConfirmation` | SENT только при подтверждении |
+
+## Ключевые решения
+
+1. **Дедупликация через уникальный индекс `messages.dedupKey`** (SHA-256 от источника, беседы, отправителя,
+   времени и текста). Повторные события (обновление уведомления, переподключение сервиса,
+   `getActiveNotifications()` после перезапуска) отбрасываются базой, а не логикой в памяти.
+2. **Удаление уведомления не удаляет историю** — только деактивирует действия беседы.
+3. **PendingIntent не хранится в базе.** После перезапуска процесса флаги действий сбрасываются,
+   сервис заново регистрирует активные уведомления.
+4. **Честные статусы.** `HandedOff` (RemoteInput вызван) → `UNKNOWN`; `SENT` — только если приложение
+   показало наш ответ в обновлённом уведомлении (окно 10 минут) или при официальном API.
+   Если ни одного канала нет, сообщение не сохраняется вовсе.
+5. **Поиск — FTS4 c токенайзером unicode61** (external content на таблице messages, триггеры Room).
+   Корректно приводит регистр кириллицы; префиксный поиск `слово*`; ввод пользователя санитизируется
+   (`FtsQueryBuilder`), операторы FTS не пробрасываются. «ё» и «е» различаются.
+6. **Пагинация везде** (Paging 3 + room-paging): лента, диалог, чаты, поиск. История не грузится в память целиком.
+7. **Неизвестные приложения обнаруживаются, но выключены** до решения пользователя.
+8. **Безопасность**: нет разрешения INTERNET; `allowBackup=false` и исключение всех доменов в
+   `data_extraction_rules`; содержимое сообщений не пишется в лог; токены — AES-GCM ключом Android Keystore
+   (`TokenVault`). База **не зашифрована** (SQLCipher не подключён: требует управления ключом и
+   внешней зависимости — решение отложено, в UI это сказано прямо).
+9. **Миграции**: только явные (`NexusDatabase.MIGRATIONS`), без `fallbackToDestructiveMigration` —
+   история не должна теряться молча. Схема экспортируется в `core/data/schemas`.
+10. **EMUI**: сервис просит `requestRebind` при отключении; экран диагностики показывает доступ,
+    подключение сервиса, оптимизацию батареи, ограничение фона, и даёт переходы в настройки EMUI.
+    NEXUS не меняет защищённые настройки сам.
+
+## Стек и версии
+
+Kotlin 2.1.0, AGP 8.7.3, Gradle 8.14.3, KSP 2.1.0-1.0.29, Compose BOM 2024.12.01 (Material 3),
+Hilt 2.53.1, Room 2.6.1, Paging 3.3.5, WorkManager 2.10.0, DataStore 1.1.1, Coroutines 1.9.0.
+compileSdk/targetSdk 35, minSdk 26, JVM target 17.
+
+Не подключены, т.к. в v0.1 нечему их использовать (ТЗ запрещает фиктивные интеграции):
+Retrofit/OkHttp и Kotlinx Serialization — появятся с первой интеграцией уровня C.
+
+## Сборка
+
+- CI: `.github/workflows/build.yml` — unit-тесты engine, `assembleDebug`, проверка наличия
+  `releases/NEXUS-debug.apk`, артефакт APK; отдельный job — инструментальные тесты на эмуляторе API 30.
+- Локально (Windows): `gradlew.bat assembleDebug` → `releases\NEXUS-debug.apk`.

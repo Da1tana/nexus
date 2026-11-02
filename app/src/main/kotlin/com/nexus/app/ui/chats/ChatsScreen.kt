@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Reply
+import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -151,7 +151,7 @@ private fun ConversationRow(item: ConversationListItem, onClick: () -> Unit) {
                 if (item.hasActiveReply) {
                     Spacer(Modifier.width(6.dp))
                     Icon(
-                        Icons.Outlined.Reply,
+                        Icons.AutoMirrored.Outlined.Reply,
                         contentDescription = "Доступен быстрый ответ",
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary,

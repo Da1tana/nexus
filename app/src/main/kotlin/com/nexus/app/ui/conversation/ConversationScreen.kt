@@ -17,7 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -203,7 +203,7 @@ fun ConversationScreen(
                 },
                 actions = {
                     IconButton(onClick = viewModel::openOriginal) {
-                        Icon(Icons.Filled.OpenInNew, contentDescription = "Открыть в исходном приложении")
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Открыть в исходном приложении")
                     }
                 },
             )

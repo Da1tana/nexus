@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -41,9 +42,9 @@ class NavigationTest {
         compose.onNodeWithText("Подключённые приложения").performClick()
         compose.onNodeWithContentDescription("Назад").assertIsDisplayed().performClick()
 
-        compose.onNodeWithText("Диагностика").performClick()
+        compose.onNodeWithText("Диагностика").performScrollTo().performClick()
         compose.onNodeWithText("Сбор сообщений").assertIsDisplayed()
         compose.onNodeWithContentDescription("Назад").performClick()
-        compose.onNodeWithText("Хранение истории").assertIsDisplayed()
+        compose.onNodeWithText("Хранение истории").performScrollTo().assertIsDisplayed()
     }
 }
