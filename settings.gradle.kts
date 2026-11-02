@@ -16,6 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "NEXUS"
 
+include(":app")
 include(":core:model")
 include(":core:engine")
 include(":core:data")

@@ -34,7 +34,7 @@ dependencies {
     api(project(":core:model"))
     api(project(":core:engine"))
 
-    implementation(libs.room.runtime)
+    api(libs.room.runtime)
     implementation(libs.room.ktx)
     implementation(libs.room.paging)
     ksp(libs.room.compiler)
