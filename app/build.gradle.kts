@@ -21,7 +21,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    /*
+     * Постоянный ключ debug-сборок, чтобы новые версии устанавливались поверх старых.
+     * Ключ только для отладочных сборок: он публичный и не подходит для релиза в магазин.
+     */
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("keys/nexus-debug.jks")
+            storePassword = "nexusdebug"
+            keyAlias = "nexus-debug"
+            keyPassword = "nexusdebug"
+            // Все схемы подписи: v1 нужна части установщиков (в т.ч. на EMUI/HarmonyOS), v2/v3 — современным Android.
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

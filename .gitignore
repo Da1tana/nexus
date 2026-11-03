@@ -8,3 +8,4 @@ captures/
 .externalNativeBuild/
 .cxx/
 /releases/*.apk
+!keys/nexus-debug.jks

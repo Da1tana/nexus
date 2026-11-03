@@ -40,6 +40,15 @@ jobs:
           test -f releases/NEXUS-debug.apk
           ls -la releases/
 
+      - name: Verify APK signature (apksigner)
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --verbose --print-certs releases/NEXUS-debug.apk | tee apksigner.txt
+          grep -q "Verified using v1 scheme (JAR signing): true" apksigner.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt
+          grep -q "CN=NEXUS Debug" apksigner.txt
+          "$BT/aapt2" dump badging releases/NEXUS-debug.apk | grep -E "^package|sdkVersion|targetSdkVersion"
+
       - name: Print Room schema
         run: find core/data/schemas -name '*.json' -exec sh -c 'echo "=== $1"; cat "$1"' _ {} \;
 
@@ -49,10 +58,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete debug-latest --yes --cleanup-tag || true
+          SIZE=$(stat -c %s releases/NEXUS-debug.apk)
+          SHA=$(sha256sum releases/NEXUS-debug.apk | cut -d' ' -f1)
+          VERSION=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2)
+          printf '%s\n' \
+            "Автоматическая debug-сборка NEXUS $VERSION из main (${GITHUB_SHA::7})." \
+            "" \
+            "Размер файла: $SIZE байт. Если скачанный файл меньше — загрузка оборвалась, скачайте заново." \
+            "SHA-256: $SHA" \
+            "" \
+            "Установка: скачать NEXUS-debug.apk на телефон и открыть." > notes.txt
           gh release create debug-latest releases/NEXUS-debug.apk \
             --prerelease \
-            --title "NEXUS debug ${GITHUB_SHA::7}" \
-            --notes "Автоматическая debug-сборка из main (${GITHUB_SHA::7}). Установка: скачать NEXUS-debug.apk на телефон и открыть."
+            --title "NEXUS $VERSION debug (${GITHUB_SHA::7})" \
+            --notes-file notes.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
