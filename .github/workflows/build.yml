@@ -54,7 +54,7 @@ jobs:
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$BT/zipalign" -c -P 16 4 releases/NEXUS-debug.apk && echo "zipalign: OK"
-          "$BT/apksigner" verify --verbose --print-certs releases/NEXUS-debug.apk | tee apksigner.txt
+          "$BT/apksigner" verify --min-sdk-version 21 --verbose --print-certs releases/NEXUS-debug.apk | tee apksigner.txt
           grep -q "Verified using v1 scheme (JAR signing): true" apksigner.txt
           grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt
           grep -q "CN=NEXUS Debug" apksigner.txt
