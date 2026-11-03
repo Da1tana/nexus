@@ -115,12 +115,3 @@ tasks.matching { it.name == "assembleDebug" }.configureEach {
     finalizedBy(copyDebugApk)
 }
 
-// AGP пропускает v1-подпись при minSdk >= 24 даже при enableV1Signing = true в DSL;
-// явно включаем её на уровне варианта для совместимости со всеми установщиками.
-androidComponents {
-    onVariants(selector().withBuildType("debug")) { variant ->
-        variant.signingConfig.enableV1Signing.set(true)
-        variant.signingConfig.enableV2Signing.set(true)
-        variant.signingConfig.enableV3Signing.set(true)
-    }
-}

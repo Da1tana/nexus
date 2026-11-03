@@ -40,9 +40,20 @@ jobs:
           test -f releases/NEXUS-debug.apk
           ls -la releases/
 
+      - name: Sign APK with v1+v2+v3 (apksigner)
+        # AGP не ставит v1 (JAR) подпись при minSdk >= 24; часть установщиков (EMUI/HarmonyOS) надёжнее работает с полным набором.
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" sign --ks keys/nexus-debug.jks --ks-pass pass:nexusdebug --ks-key-alias nexus-debug --key-pass pass:nexusdebug \
+            --min-sdk-version 21 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --out releases/NEXUS-debug-signed.apk releases/NEXUS-debug.apk
+          mv releases/NEXUS-debug-signed.apk releases/NEXUS-debug.apk
+          rm -f releases/NEXUS-debug.apk.idsig
+
       - name: Verify APK signature (apksigner)
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -c -P 16 4 releases/NEXUS-debug.apk && echo "zipalign: OK"
           "$BT/apksigner" verify --verbose --print-certs releases/NEXUS-debug.apk | tee apksigner.txt
           grep -q "Verified using v1 scheme (JAR signing): true" apksigner.txt
           grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt
