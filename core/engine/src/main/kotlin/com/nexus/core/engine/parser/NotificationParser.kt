@@ -1,5 +1,6 @@
 package com.nexus.core.engine.parser
 
+import com.nexus.core.engine.source.SourceCatalog
 import com.nexus.core.model.ActionKind
 import com.nexus.core.model.IgnoreReason
 import com.nexus.core.model.ParseResult
@@ -29,6 +30,7 @@ class NotificationParser(
         if (raw.category != null && raw.category in NON_MESSAGE_CATEGORIES) {
             return ParseResult.Ignored(IgnoreReason.NOT_A_MESSAGE)
         }
+        if (isAppLevelSummary(raw)) return ParseResult.Ignored(IgnoreReason.GROUP_SUMMARY)
 
         val payload = handlers.firstNotNullOfOrNull { it.parse(raw) }
             ?: return ParseResult.Ignored(IgnoreReason.EMPTY)
@@ -41,6 +43,21 @@ class NotificationParser(
             ReplyCapability.NONE
         }
         return ParseResult.Messages(payload.conversation, payload.messages, actions, replyCapability)
+    }
+
+    /**
+     * Сводка уровня приложения («WhatsApp: 5 новых сообщений», «12 сообщений из 3 чатов»),
+     * не помеченная как group summary. Не является сообщением и не должна создавать беседу.
+     * Счётчик с именем конкретного отправителя (скрытый текст в чате) сохраняется как скрытое сообщение.
+     */
+    private fun isAppLevelSummary(raw: RawNotification): Boolean {
+        if (raw.styleMessages.isNotEmpty() || raw.textLines.isNotEmpty()) return false
+        val text = raw.bigText.clean() ?: raw.text.clean() ?: return false
+        if (!HiddenContentDetector.isCountSummary(text)) return false
+        val title = raw.title.clean() ?: return true
+        val appName = SourceCatalog.find(raw.packageName)?.displayName
+        return text.contains(" из ") || text.contains(" from ") ||
+            (appName != null && title.equals(appName, ignoreCase = true))
     }
 
     companion object {

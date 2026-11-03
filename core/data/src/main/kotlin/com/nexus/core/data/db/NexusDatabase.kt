@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -35,7 +36,7 @@ abstract class NexusDatabase : RoomDatabase() {
     abstract fun connectorAccountDao(): ConnectorAccountDao
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val NAME = "nexus.db"
 
         /**
@@ -43,7 +44,16 @@ abstract class NexusDatabase : RoomDatabase() {
          * и тест в NexusMigrationTest. Разрушающая миграция намеренно не включена —
          * история пользователя не должна теряться молча.
          */
-        val MIGRATIONS: Array<Migration> = emptyArray()
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE app_sources ADD COLUMN userDecision INTEGER")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN avatarPath TEXT")
+                // В v1 источник мог быть выключен только вручную — сохраняем это как явный выбор.
+                db.execSQL("UPDATE app_sources SET userDecision = 0 WHERE enabled = 0 AND isKnownMessenger = 1")
+            }
+        }
+
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
 
         fun create(context: Context, inMemory: Boolean = false): NexusDatabase {
             val builder = if (inMemory) {

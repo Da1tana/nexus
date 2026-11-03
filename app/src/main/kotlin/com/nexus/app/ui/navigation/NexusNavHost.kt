@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -35,19 +33,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.nexus.app.ui.chats.ChatsScreen
 import com.nexus.app.ui.contacts.ContactsScreen
 import com.nexus.app.ui.conversation.ConversationScreen
 import com.nexus.app.ui.conversation.ConversationViewModel
 import com.nexus.app.ui.diagnostics.DiagnosticsScreen
-import com.nexus.app.ui.inbox.InboxScreen
+import com.nexus.app.ui.messages.MessagesScreen
 import com.nexus.app.ui.search.SearchScreen
 import com.nexus.app.ui.settings.SettingsScreen
 import com.nexus.app.ui.settings.SourcesScreen
 
 object Routes {
-    const val INBOX = "inbox"
-    const val CHATS = "chats"
+    const val MESSAGES = "messages"
     const val CONTACTS = "contacts"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
@@ -66,10 +62,9 @@ private data class TopDestination(
 )
 
 private val topDestinations = listOf(
-    TopDestination(Routes.INBOX, "Входящие", Icons.Outlined.Inbox, Icons.Filled.Inbox),
-    TopDestination(Routes.CHATS, "Чаты", Icons.Outlined.Forum, Icons.Filled.Forum),
-    TopDestination(Routes.CONTACTS, "Контакты", Icons.Outlined.People, Icons.Filled.People),
+    TopDestination(Routes.MESSAGES, "Сообщения", Icons.Outlined.Forum, Icons.Filled.Forum),
     TopDestination(Routes.SEARCH, "Поиск", Icons.Outlined.Search, Icons.Filled.Search),
+    TopDestination(Routes.CONTACTS, "Контакты", Icons.Outlined.People, Icons.Filled.People),
     TopDestination(Routes.SETTINGS, "Настройки", Icons.Outlined.Settings, Icons.Filled.Settings),
 )
 
@@ -97,7 +92,7 @@ fun NexusNavHost(unreadCount: Int, navController: NavHostController = rememberNa
                             },
                             icon = {
                                 val icon = if (selected) destination.selectedIcon else destination.icon
-                                if (destination.route == Routes.INBOX && unreadCount > 0) {
+                                if (destination.route == Routes.MESSAGES && unreadCount > 0) {
                                     BadgedBox(badge = { Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) } }) {
                                         Icon(icon, contentDescription = destination.label)
                                     }
@@ -114,15 +109,14 @@ fun NexusNavHost(unreadCount: Int, navController: NavHostController = rememberNa
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = Routes.INBOX,
+            startDestination = Routes.MESSAGES,
             modifier = Modifier.fillMaxSize().padding(padding),
             enterTransition = { fadeIn() },
             exitTransition = { fadeOut() },
         ) {
             val openConversation: (Long) -> Unit = { navController.navigate(Routes.conversation(it)) }
 
-            composable(Routes.INBOX) { InboxScreen(onOpenConversation = openConversation) }
-            composable(Routes.CHATS) { ChatsScreen(onOpenConversation = openConversation) }
+            composable(Routes.MESSAGES) { MessagesScreen(onOpenConversation = openConversation) }
             composable(Routes.CONTACTS) { ContactsScreen() }
             composable(Routes.SEARCH) { SearchScreen(onOpenConversation = openConversation) }
             composable(Routes.SETTINGS) {

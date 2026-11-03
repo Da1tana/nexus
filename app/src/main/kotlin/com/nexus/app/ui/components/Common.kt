@@ -94,28 +94,44 @@ fun CountBadge(count: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** Фильтр по источникам: «Все» + источники, из которых есть сообщения. */
+/**
+ * Строка фильтров: необязательный чип «Непрочитанные», «Все» и источники с иконками приложений.
+ */
 @Composable
 fun SourceFilterRow(
     sources: List<AppSourceEntity>,
     selected: String?,
     onSelect: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    unreadOnly: Boolean? = null,
+    onUnreadOnlyChange: (Boolean) -> Unit = {},
 ) {
-    if (sources.isEmpty()) return
+    if (sources.isEmpty() && unreadOnly == null) return
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("Все") })
+        if (unreadOnly != null) {
+            item {
+                FilterChip(
+                    selected = unreadOnly,
+                    onClick = { onUnreadOnlyChange(!unreadOnly) },
+                    label = { Text("Непрочитанные") },
+                )
+            }
+        }
+        if (sources.size > 1) {
+            item {
+                FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("Все") })
+            }
         }
         items(sources, key = { it.packageName }) { source ->
             FilterChip(
                 selected = selected == source.packageName,
                 onClick = { onSelect(if (selected == source.packageName) null else source.packageName) },
                 label = { Text(source.displayName) },
+                leadingIcon = { AppIcon(source.packageName, size = 18.dp) },
             )
         }
     }

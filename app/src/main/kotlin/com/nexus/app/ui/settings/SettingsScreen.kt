@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.nexus.app.BuildConfig
 import com.nexus.app.notifications.ActiveNotificationRegistry
+import com.nexus.app.notifications.AvatarStore
 import com.nexus.app.security.TokenVault
 import com.nexus.app.settings.AppSettings
 import com.nexus.app.settings.SettingsStore
@@ -68,6 +69,7 @@ class SettingsViewModel @Inject constructor(
     private val maintenance: MaintenanceRepository,
     private val vault: TokenVault,
     private val registry: ActiveNotificationRegistry,
+    private val avatars: AvatarStore,
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = store.settings
@@ -89,6 +91,7 @@ class SettingsViewModel @Inject constructor(
             sources.clearAll()
             vault.clear()
             registry.clear()
+            avatars.clear()
         }
     }
 }
@@ -114,7 +117,7 @@ fun SettingsScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             SectionTitle("Источники")
-            SettingRow(Icons.Outlined.Apps, "Подключённые приложения", "Какие приложения сохранять и что они умеют", onOpenSources)
+            SettingRow(Icons.Outlined.Apps, "Приложения", "Откуда собирать сообщения: мессенджеры и любые другие приложения", onOpenSources)
             SettingRow(
                 Icons.Outlined.Notifications,
                 "Доступ к уведомлениям",

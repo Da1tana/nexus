@@ -9,6 +9,7 @@ import com.nexus.core.data.repository.NotificationRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -28,11 +29,15 @@ class NexusNotificationListener : NotificationListenerService() {
     @Inject lateinit var repository: NotificationRepository
     @Inject lateinit var registry: ActiveNotificationRegistry
     @Inject lateinit var status: ListenerStatus
+    @Inject lateinit var avatars: AvatarStore
+    @Inject lateinit var reprocess: ReprocessRequests
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Последовательная обработка: события одного уведомления приходят по порядку. */
     private val mutex = Mutex()
+
+    private var reprocessJob: Job? = null
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -41,20 +46,29 @@ class NexusNotificationListener : NotificationListenerService() {
             mutex.withLock {
                 repository.resetActiveActions()
                 registry.clear()
-                val active = try {
-                    activeNotifications?.toList().orEmpty()
-                } catch (e: SecurityException) {
-                    status.onError("Нет доступа к активным уведомлениям")
-                    emptyList()
-                }
-                // Уведомления, пришедшие пока сервис был остановлен, — дубликаты отсеет база.
-                active.forEach { process(it) }
+                processActive()
             }
         }
+        reprocessJob?.cancel()
+        reprocessJob = scope.launch {
+            reprocess.requests.collect { mutex.withLock { processActive() } }
+        }
+    }
+
+    /** Уведомления, уже висящие в шторке (пропущенные, пока сервис был остановлен, или от только что включённого приложения). */
+    private suspend fun processActive() {
+        val active = try {
+            activeNotifications?.toList().orEmpty()
+        } catch (e: SecurityException) {
+            status.onError("Нет доступа к активным уведомлениям")
+            emptyList()
+        }
+        active.forEach { process(it) }
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        reprocessJob?.cancel()
         status.onDisconnected(System.currentTimeMillis())
         registry.clear()
         // Просим систему переподключить сервис (актуально для агрессивного энергосбережения EMUI).
@@ -90,8 +104,13 @@ class NexusNotificationListener : NotificationListenerService() {
             val raw = NotificationExtractor.extract(sbn)
             val report = repository.ingest(raw)
             val conversationKey = report.conversationExternalKey
-            if (report.outcome == IngestOutcome.PROCESSED && conversationKey != null) {
+            val conversationId = report.conversationId
+            if (report.outcome == IngestOutcome.PROCESSED && conversationKey != null && conversationId != null) {
                 registry.register(raw.packageName, conversationKey, sbn)
+                avatars.save(conversationId, sbn)?.let { path ->
+                    val previous = repository.setConversationAvatar(conversationId, path)
+                    if (previous != null && previous != path) avatars.delete(previous)
+                }
             }
             status.onEvent(System.currentTimeMillis(), raw.packageName, report.outcome.name)
         } catch (e: Exception) {

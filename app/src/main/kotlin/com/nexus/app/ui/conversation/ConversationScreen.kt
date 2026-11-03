@@ -1,5 +1,15 @@
 package com.nexus.app.ui.conversation
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import com.nexus.app.ui.components.ConversationAvatar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -177,6 +184,8 @@ fun ConversationScreen(
     val composer by viewModel.composer.collectAsStateWithLifecycle()
     val items = viewModel.messageFeed.collectAsLazyPagingItems()
     val snackbar = remember { SnackbarHostState() }
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { snackbar.showSnackbar(it) }
@@ -192,13 +201,30 @@ fun ConversationScreen(
                     }
                 },
                 title = {
-                    Column {
-                        Text(conversation?.conversation?.title ?: "", maxLines = 1)
-                        Text(
-                            conversation?.sourceName ?: "",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                    val item = conversation
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (item != null) {
+                            ConversationAvatar(
+                                item.conversation.title,
+                                item.conversation.avatarPath,
+                                item.conversation.sourcePackage,
+                                size = 40.dp,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Column {
+                            Text(
+                                item?.conversation?.title ?: "",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                item?.sourceName ?: "",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -229,7 +255,14 @@ fun ConversationScreen(
                 val startsDay = older == null || TimeFormat.day(older.timestamp) != TimeFormat.day(message.timestamp)
                 Column {
                     if (startsDay) DayHeader(TimeFormat.header(message.timestamp))
-                    MessageBubble(message, showSender = conversation?.conversation?.isGroup == true)
+                    MessageBubble(
+                        message,
+                        showSender = conversation?.conversation?.isGroup == true,
+                        onLongPress = {
+                            clipboard.setText(AnnotatedString(message.body))
+                            scope.launch { snackbar.showSnackbar("Текст скопирован") }
+                        },
+                    )
                 }
             }
             item { Spacer(Modifier.height(8.dp)) }
@@ -254,8 +287,9 @@ private fun DayHeader(text: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: MessageEntity, showSender: Boolean) {
+private fun MessageBubble(message: MessageEntity, showSender: Boolean, onLongPress: () -> Unit) {
     val outgoing = message.direction == MessageDirection.OUTGOING
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -269,7 +303,17 @@ private fun MessageBubble(message: MessageEntity, showSender: Boolean) {
                 bottomEnd = if (outgoing) 4.dp else 18.dp,
             ),
             color = if (outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (outgoing) 18.dp else 4.dp,
+                        bottomEnd = if (outgoing) 4.dp else 18.dp,
+                    ),
+                )
+                .combinedClickable(onClick = {}, onLongClick = onLongPress),
         ) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 if (showSender && !outgoing && message.senderName != null) {
@@ -342,26 +386,18 @@ private fun Composer(
                 }
             }
         } else {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        "Быстрый ответ недоступен",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Ответ из NEXUS возможен, пока в шторке есть уведомление этой беседы с кнопкой «Ответить». " +
-                            "Сейчас его нет — ответьте в приложении $sourceName.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onOpenOriginal) { Text("Открыть $sourceName") }
-                }
+                Text(
+                    "Ответ из NEXUS доступен, пока уведомление чата висит в шторке",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                FilledTonalButton(onClick = onOpenOriginal) { Text("Ответить в $sourceName", maxLines = 1) }
             }
         }
     }

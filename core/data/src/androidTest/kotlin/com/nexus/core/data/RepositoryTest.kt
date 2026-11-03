@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nexus.core.data.db.NexusDatabase
 import com.nexus.core.data.repository.ContactRepository
+import com.nexus.core.data.repository.ConversationRepository
 import com.nexus.core.data.repository.IngestOutcome
 import com.nexus.core.data.repository.MaintenanceRepository
 import com.nexus.core.data.repository.MessageRepository
@@ -135,7 +136,7 @@ class RepositoryTest {
         )
         assertEquals(IngestOutcome.SOURCE_DISABLED, report.outcome)
         assertEquals(0, db.messageDao().observeCount().first())
-        SourceRepository(db).setEnabled("com.example.shop", true)
+        SourceRepository(db).setEnabled("com.example.shop", "Магазин", true)
         assertEquals(1, notifications.ingest(
             RawNotification(key = "x", packageName = "com.example.shop", postTime = now, whenTime = now, title = "Магазин", text = "Скидка"),
         ).inserted)
@@ -215,5 +216,50 @@ class RepositoryTest {
         SourceRepository(db).clearHistory("org.telegram.messenger")
         assertEquals(listOf("WA"), load(db.messageDao().inboxPagingSource(null, false)).map { it.message.body })
         assertEquals(1, db.contactDao().observeCount().first())
+    }
+
+    @Test
+    fun unknownMessagingApp_isAutoEnabled_butUserChoiceWins() = runTest {
+        val chat = RawNotification(
+            key = "m1", packageName = "com.unknown.chat", postTime = now, whenTime = now,
+            category = "msg", title = "Ольга", text = "Привет",
+        )
+        assertEquals(IngestOutcome.PROCESSED, notifications.ingest(chat).outcome)
+
+        SourceRepository(db).setEnabled("com.unknown.chat", "Chat", false)
+        val after = notifications.ingest(chat.copy(key = "m2", whenTime = now + 1, text = "Ещё"))
+        assertEquals(IngestOutcome.SOURCE_DISABLED, after.outcome)
+    }
+
+    @Test
+    fun appEnabledBeforeFirstNotification_isStored() = runTest {
+        SourceRepository(db).setEnabled("com.example.bank", "Банк", true)
+        val report = notifications.ingest(
+            RawNotification(key = "b", packageName = "com.example.bank", postTime = now, whenTime = now, title = "Банк", text = "Списание 100 ₽"),
+        )
+        assertEquals(1, report.inserted)
+        assertEquals("Банк", db.sourceDao().get("com.example.bank")!!.displayName)
+    }
+
+    @Test
+    fun deleteConversation_removesMessages_keepsOthers() = runTest {
+        val a = notifications.ingest(telegram(RawStyleMessage("A", 100, "Анна", null, false)))
+        notifications.ingest(
+            RawNotification(key = "w1", packageName = "com.whatsapp", postTime = now, whenTime = now, title = "Борис", text = "WA"),
+        )
+        ConversationRepository(db).delete(a.conversationId!!)
+        assertEquals(1, db.conversationDao().observeCount().first())
+        assertEquals(1, db.messageDao().observeCount().first())
+    }
+
+    @Test
+    fun conversations_unreadOnlyFilter() = runTest {
+        val a = notifications.ingest(telegram(RawStyleMessage("A", 100, "Анна", null, false)))
+        notifications.ingest(
+            RawNotification(key = "w1", packageName = "com.whatsapp", postTime = now, whenTime = now, title = "Борис", text = "WA"),
+        )
+        MessageRepository(db, ReplyEngine(listOf(channel)), { now }).markConversationRead(a.conversationId!!)
+        assertEquals(2, load(db.conversationDao().pagingSource(null, false)).size)
+        assertEquals(listOf("Борис"), load(db.conversationDao().pagingSource(null, true)).map { it.conversation.title })
     }
 }

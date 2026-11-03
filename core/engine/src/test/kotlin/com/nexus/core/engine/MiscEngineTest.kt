@@ -3,7 +3,11 @@ package com.nexus.core.engine
 import com.nexus.core.engine.parser.DedupKeys
 import com.nexus.core.engine.parser.HiddenContentDetector
 import com.nexus.core.engine.source.SourceCatalog
+import com.nexus.core.engine.source.SourcePolicy
 import com.nexus.core.model.IntegrationLevel
+import com.nexus.core.model.RawAction
+import com.nexus.core.model.RawNotification
+import com.nexus.core.model.RawStyleMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -35,6 +39,28 @@ class MiscEngineTest {
     fun retention_cutoff() {
         assertNull(RetentionPolicy.cutoff(1_000_000_000, 0))
         assertEquals(1_000_000_000L - 7L * 86_400_000, RetentionPolicy.cutoff(1_000_000_000, 7))
+    }
+
+    @Test
+    fun sourcePolicy_autoEnablesMessagingLikeApps() {
+        fun raw(pkg: String, category: String? = null, reply: Boolean = false, style: Boolean = false) = RawNotification(
+            key = "k", packageName = pkg, postTime = 1, whenTime = 1, category = category, title = "t", text = "x",
+            actions = if (reply) listOf(RawAction("Ответить", true)) else emptyList(),
+            styleMessages = if (style) listOf(RawStyleMessage("x", 1, "a", null, false)) else emptyList(),
+        )
+        assertTrue(SourcePolicy.autoEnable(raw("ru.oneme.app")))
+        assertTrue(SourcePolicy.autoEnable(raw("com.unknown.chat", category = "msg")))
+        assertTrue(SourcePolicy.autoEnable(raw("com.unknown.chat", reply = true)))
+        assertTrue(SourcePolicy.autoEnable(raw("com.unknown.chat", style = true)))
+        assertFalse(SourcePolicy.autoEnable(raw("com.example.shop", category = "promo")))
+        assertFalse(SourcePolicy.autoEnable(raw("com.example.bank")))
+    }
+
+    @Test
+    fun countSummary_detection() {
+        assertTrue(HiddenContentDetector.isCountSummary("5 сообщений из 3 чатов"))
+        assertTrue(HiddenContentDetector.isCountSummary("12 messages from 4 chats"))
+        assertFalse(HiddenContentDetector.isCountSummary("Купи 2 хлеба"))
     }
 
     @Test

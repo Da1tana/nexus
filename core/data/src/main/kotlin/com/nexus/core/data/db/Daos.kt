@@ -20,16 +20,25 @@ interface SourceDao {
     @Query("UPDATE app_sources SET lastSeenAt = :time WHERE packageName = :packageName")
     suspend fun touch(packageName: String, time: Long)
 
-    @Query("UPDATE app_sources SET enabled = :enabled WHERE packageName = :packageName")
-    suspend fun setEnabled(packageName: String, enabled: Boolean)
+    /** Автоматическое включение по SourcePolicy — не трогает явный выбор пользователя. */
+    @Query("UPDATE app_sources SET enabled = 1 WHERE packageName = :packageName AND userDecision IS NULL")
+    suspend fun autoEnable(packageName: String)
+
+    /** Явный выбор пользователя. */
+    @Query("UPDATE app_sources SET enabled = :enabled, userDecision = :enabled WHERE packageName = :packageName")
+    suspend fun setDecision(packageName: String, enabled: Boolean): Int
+
+    @Query("UPDATE app_sources SET enabled = 1, userDecision = 1 WHERE enabled = 0")
+    suspend fun enableAll(): Int
 
     @Query(
         """
         SELECT s.*,
           (SELECT COUNT(*) FROM messages m WHERE m.sourcePackage = s.packageName) AS messageCount,
-          (SELECT COUNT(*) FROM conversations c WHERE c.sourcePackage = s.packageName) AS conversationCount
+          (SELECT COUNT(*) FROM conversations c WHERE c.sourcePackage = s.packageName) AS conversationCount,
+          COALESCE((SELECT st.notificationsSeen FROM sync_state st WHERE st.sourcePackage = s.packageName), 0) AS notificationsSeen
         FROM app_sources s
-        ORDER BY s.isKnownMessenger DESC, s.displayName COLLATE NOCASE
+        ORDER BY s.enabled DESC, s.isKnownMessenger DESC, s.displayName COLLATE NOCASE
         """,
     )
     fun observeAll(): Flow<List<SourceListItem>>
@@ -39,7 +48,7 @@ interface SourceDao {
         """
         SELECT * FROM app_sources s
         WHERE EXISTS (SELECT 1 FROM messages m WHERE m.sourcePackage = s.packageName)
-        ORDER BY s.displayName COLLATE NOCASE
+        ORDER BY (SELECT MAX(m.timestamp) FROM messages m WHERE m.sourcePackage = s.packageName) DESC
         """,
     )
     fun observeWithMessages(): Flow<List<AppSourceEntity>>
@@ -71,10 +80,11 @@ interface ConversationDao {
         FROM conversations c
         JOIN app_sources s ON s.packageName = c.sourcePackage
         WHERE (:sourcePackage IS NULL OR c.sourcePackage = :sourcePackage)
+          AND (:unreadOnly = 0 OR EXISTS (SELECT 1 FROM messages m WHERE m.conversationId = c.id AND m.status = 'RECEIVED'))
         ORDER BY c.lastMessageAt DESC
         """,
     )
-    fun pagingSource(sourcePackage: String?): PagingSource<Int, ConversationListItem>
+    fun pagingSource(sourcePackage: String?, unreadOnly: Boolean): PagingSource<Int, ConversationListItem>
 
     @Query(
         """
@@ -91,6 +101,15 @@ interface ConversationDao {
 
     @Query("DELETE FROM conversations WHERE sourcePackage = :sourcePackage")
     suspend fun deleteBySource(sourcePackage: String): Int
+
+    @Query("DELETE FROM conversations WHERE id = :id")
+    suspend fun delete(id: Long): Int
+
+    @Query("UPDATE conversations SET avatarPath = :path WHERE id = :id")
+    suspend fun setAvatar(id: Long, path: String?)
+
+    @Query("SELECT avatarPath FROM conversations WHERE avatarPath IS NOT NULL")
+    suspend fun allAvatarPaths(): List<String>
 
     @Query("DELETE FROM conversations WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversationId = conversations.id)")
     suspend fun deleteEmpty(): Int

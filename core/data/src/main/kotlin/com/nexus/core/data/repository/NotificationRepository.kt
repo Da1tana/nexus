@@ -13,6 +13,7 @@ import com.nexus.core.data.db.SyncStateEntity
 import com.nexus.core.engine.parser.NotificationParser
 import com.nexus.core.engine.reply.OutgoingConfirmation
 import com.nexus.core.engine.source.SourceCatalog
+import com.nexus.core.engine.source.SourcePolicy
 import com.nexus.core.model.IgnoreReason
 import com.nexus.core.model.MessageDirection
 import com.nexus.core.model.MessageStatus
@@ -70,7 +71,7 @@ class NotificationRepository(
         val now = clock()
 
         return db.withTransaction {
-            val source = ensureSource(raw.packageName, now)
+            val source = ensureSource(raw, now)
             if (!source.enabled) {
                 recordStats(raw.packageName, seen = 1, ignoreReason = "SOURCE_DISABLED")
                 return@withTransaction IngestReport(IngestOutcome.SOURCE_DISABLED)
@@ -171,10 +172,20 @@ class NotificationRepository(
         actionDao.deactivateAll(clock())
     }
 
-    private suspend fun ensureSource(packageName: String, now: Long): AppSourceEntity {
+    /**
+     * Находит или создаёт источник и применяет SourcePolicy, пока пользователь не сделал выбор сам:
+     * приложение включается, как только присылает уведомление, похожее на сообщение.
+     */
+    private suspend fun ensureSource(raw: RawNotification, now: Long): AppSourceEntity {
+        val packageName = raw.packageName
+        val autoEnable = SourcePolicy.autoEnable(raw)
         val existing = sourceDao.get(packageName)
         if (existing != null) {
             sourceDao.touch(packageName, now)
+            if (!existing.enabled && existing.userDecision == null && autoEnable) {
+                sourceDao.autoEnable(packageName)
+                return existing.copy(enabled = true)
+            }
             return existing
         }
         val known = SourceCatalog.find(packageName)
@@ -182,13 +193,20 @@ class NotificationRepository(
             packageName = packageName,
             displayName = known?.displayName ?: appLabelResolver(packageName),
             isKnownMessenger = known != null,
-            // Известные мессенджеры включены сразу, прочие приложения — только после явного включения.
-            enabled = known != null,
+            enabled = autoEnable,
             firstSeenAt = now,
             lastSeenAt = now,
+            userDecision = null,
         )
         sourceDao.insert(created)
         return created
+    }
+
+    /** Сохраняет путь к аватару беседы. Возвращает прежний путь, чтобы вызывающий удалил старый файл. */
+    suspend fun setConversationAvatar(conversationId: Long, path: String): String? {
+        val previous = conversationDao.get(conversationId)?.avatarPath
+        conversationDao.setAvatar(conversationId, path)
+        return previous
     }
 
     private suspend fun upsertConversation(raw: RawNotification, result: ParseResult.Messages, now: Long): ConversationEntity {

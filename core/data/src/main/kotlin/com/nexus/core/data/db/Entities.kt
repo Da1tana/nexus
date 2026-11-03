@@ -18,10 +18,12 @@ data class AppSourceEntity(
     @PrimaryKey val packageName: String,
     val displayName: String,
     val isKnownMessenger: Boolean,
-    /** Сохранять ли сообщения из этого источника. */
+    /** Сохранять ли сообщения из этого источника (действующее значение). */
     val enabled: Boolean,
     val firstSeenAt: Long,
     val lastSeenAt: Long,
+    /** Явный выбор пользователя; null — решение принимает SourcePolicy. С версии БД 2. */
+    val userDecision: Boolean? = null,
 )
 
 /** Человек. Может быть связан с несколькими аккаунтами в разных источниках. */
@@ -91,6 +93,8 @@ data class ConversationEntity(
     /** Ключ последнего уведомления беседы — для ответа и перехода в приложение. */
     val lastNotificationKey: String?,
     val replyCapability: ReplyCapability,
+    /** Файл аватара беседы из уведомления (во внутренней папке приложения). С версии БД 2. */
+    val avatarPath: String? = null,
 )
 
 /**

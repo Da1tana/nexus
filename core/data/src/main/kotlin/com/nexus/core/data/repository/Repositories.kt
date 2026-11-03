@@ -20,6 +20,7 @@ import com.nexus.core.engine.reply.ReplyEngine
 import com.nexus.core.engine.reply.ReplyTarget
 import com.nexus.core.engine.reply.SendResult
 import com.nexus.core.engine.search.FtsQueryBuilder
+import com.nexus.core.engine.source.SourceCatalog
 import com.nexus.core.model.MessageDirection
 import com.nexus.core.model.MessageStatus
 import com.nexus.core.model.ReplyCapability
@@ -36,8 +37,16 @@ private val pagingConfig = PagingConfig(pageSize = 40, prefetchDistance = 20, en
 class ConversationRepository(private val db: NexusDatabase) {
     private val dao = db.conversationDao()
 
-    fun conversations(sourcePackage: String?): Flow<PagingData<ConversationListItem>> =
-        Pager(pagingConfig) { dao.pagingSource(sourcePackage) }.flow
+    fun conversations(sourcePackage: String?, unreadOnly: Boolean = false): Flow<PagingData<ConversationListItem>> =
+        Pager(pagingConfig) { dao.pagingSource(sourcePackage, unreadOnly) }.flow
+
+    /** Удаляет диалог и его сообщения из NEXUS. Возвращает путь аватара для удаления файла. */
+    suspend fun delete(id: Long): String? = db.withTransaction {
+        val avatar = dao.get(id)?.avatarPath
+        dao.delete(id)
+        db.contactDao().deleteOrphans()
+        avatar
+    }
 
     fun observe(id: Long): Flow<ConversationListItem?> = dao.observe(id)
 
@@ -202,7 +211,31 @@ class SourceRepository(private val db: NexusDatabase) {
 
     fun sourcesWithMessages(): Flow<List<AppSourceEntity>> = dao.observeWithMessages()
 
-    suspend fun setEnabled(packageName: String, enabled: Boolean) = dao.setEnabled(packageName, enabled)
+    /**
+     * Явный выбор пользователя. Приложение, от которого ещё не было уведомлений,
+     * добавляется в список источников заранее.
+     */
+    suspend fun setEnabled(packageName: String, displayName: String, enabled: Boolean, now: Long = System.currentTimeMillis()) {
+        db.withTransaction {
+            if (dao.get(packageName) == null) {
+                dao.insert(
+                    AppSourceEntity(
+                        packageName = packageName,
+                        displayName = SourceCatalog.find(packageName)?.displayName ?: displayName,
+                        isKnownMessenger = SourceCatalog.isKnownMessenger(packageName),
+                        enabled = enabled,
+                        firstSeenAt = now,
+                        lastSeenAt = 0,
+                        userDecision = enabled,
+                    ),
+                )
+            }
+            dao.setDecision(packageName, enabled)
+        }
+    }
+
+    /** Включает все найденные, но выключенные источники. */
+    suspend fun enableAll(): Int = dao.enableAll()
 
     /** Удаляет историю источника (беседы, сообщения, действия), сам источник и его настройка остаются. */
     suspend fun clearHistory(packageName: String) {

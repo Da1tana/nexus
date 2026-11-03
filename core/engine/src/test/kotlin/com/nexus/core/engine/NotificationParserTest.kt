@@ -242,6 +242,20 @@ class NotificationParserTest {
     }
 
     @Test
+    fun appLevelCounters_areIgnored_butPerChatHiddenMessageKept() {
+        assertEquals(
+            ParseResult.Ignored(IgnoreReason.GROUP_SUMMARY),
+            parser.parse(raw(packageName = "com.whatsapp", title = "WhatsApp", text = "5 новых сообщений")),
+        )
+        assertEquals(
+            ParseResult.Ignored(IgnoreReason.GROUP_SUMMARY),
+            parser.parse(raw(packageName = "com.whatsapp", title = "Иван", text = "12 сообщений из 3 чатов")),
+        )
+        val perChat = messages(parser.parse(raw(packageName = "com.viber.voip", title = "Иван", text = "2 новых сообщения")))
+        assertTrue(perChat.messages.single().textHidden)
+    }
+
+    @Test
     fun shortcutId_definesConversationKey() {
         val a = messages(parser.parse(raw(title = "Анна", shortcutId = "chat-42")))
         val b = messages(parser.parse(raw(title = "Анна Иванова", shortcutId = "chat-42")))

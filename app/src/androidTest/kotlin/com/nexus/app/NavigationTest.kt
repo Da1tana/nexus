@@ -21,26 +21,26 @@ class NavigationTest {
 
     @Test
     fun bottomNavigation_opensEverySection() {
-        compose.onAllNodesWithText("Входящие").onFirst().assertIsDisplayed()
-
-        compose.onNodeWithText("Чаты").performClick()
-        compose.onAllNodesWithText("Чаты").onFirst().assertIsDisplayed()
-
-        compose.onNodeWithText("Контакты").performClick()
-        compose.onNodeWithText("Поиск контакта").assertIsDisplayed()
+        compose.onAllNodesWithText("Сообщения").onFirst().assertIsDisplayed()
+        compose.onNodeWithText("Диалоги").assertIsDisplayed()
+        compose.onNodeWithText("Лента").performClick()
 
         compose.onNodeWithText("Поиск").performClick()
         compose.onNodeWithText("Текст сообщения").assertIsDisplayed()
 
+        compose.onNodeWithText("Контакты").performClick()
+        compose.onNodeWithText("Поиск контакта").assertIsDisplayed()
+
         compose.onNodeWithText("Настройки").performClick()
-        compose.onNodeWithText("Подключённые приложения").assertIsDisplayed()
+        compose.onNodeWithText("Хранение истории").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun settings_opensSourcesAndDiagnostics_andBack() {
+    fun settings_opensAppsAndDiagnostics_andBack() {
         compose.onNodeWithText("Настройки").performClick()
-        compose.onNodeWithText("Подключённые приложения").performClick()
-        compose.onNodeWithContentDescription("Назад").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Приложения").performClick()
+        compose.onNodeWithText("Найти приложение").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Назад").performClick()
 
         compose.onNodeWithText("Диагностика").performScrollTo().performClick()
         compose.onNodeWithText("Сбор сообщений").assertIsDisplayed()

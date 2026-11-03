@@ -21,6 +21,7 @@ data class SourceListItem(
     @Embedded val source: AppSourceEntity,
     val messageCount: Int,
     val conversationCount: Int,
+    val notificationsSeen: Long,
 )
 
 data class ContactListItem(
